@@ -3,6 +3,7 @@ package com.yudao.mongo.transaction;
 import java.net.UnknownHostException;
 
 import com.google.gson.Gson;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBAddress;
@@ -21,7 +22,7 @@ import com.yudao.mongo.transaction.util.UUIDGenerator;
  * 处理事务核心类 <br>
  * 包含开始事务，提交事务，回滚的方法。封装了mongo添加，修改，删除操作方法。<br>
  * 
- * @author Administrator
+ * @author Austin
  * 
  */
 public class MongoTransaction {
@@ -136,9 +137,10 @@ public class MongoTransaction {
 	 * @param conclusion
 	 *            待更新结果
 	 * @throws MongoCUDException
+	 * @throws UnknownHostException 
 	 */
 	public static void update(String dbName, String collectionName,
-			DBObject query, DBObject conclusion) throws MongoCUDException {
+			DBObject query, DBObject conclusion) throws MongoCUDException, UnknownHostException {
 
 		String _id = UUIDGenerator.getUUID();
 		TransactionTable transactionTable = new TransactionTable();
@@ -159,16 +161,31 @@ public class MongoTransaction {
 			throw new MongoCUDException("mongo更新出错！");
 		}
 
-		// TODO 将待回滚后数据存入另一个库中,更新操作怎么回滚。更新多行，删除多行？
+		// 根据ID，找出所有待更新的数据，将记录插入到库中，多条存数组格式
+		DB db = Mongo
+				.connect(new DBAddress(MongoURLConstants.MONGO_URL, dbName));
+		DBCollection collection4update = db.getCollection(collectionName);
+		DBCursor cursor = collection4update.find(query);
+		BasicDBList dbList = new BasicDBList();
+		while(cursor.hasNext()){
+			DBObject next = cursor.next();
+			dbList.add(next);
+		}
 		TransactionTable rollBackTransactionTable = new TransactionTable();
 		rollBackTransactionTable.set_id(_id);
 		rollBackTransactionTable.setDbName(dbName);
 		rollBackTransactionTable.setCollectionName(collectionName);
 		rollBackTransactionTable
 				.setOperationType(OperationTypeConstants.UPDATE);
-		rollBackTransactionTable.setDbobject1(conclusion);
+		rollBackTransactionTable.setDbobject1(dbList); //TODO 将数据存入此字段会不会有问题？
 		rollBackTransactionTable.setStatus(TransactionTable.Status.BEGING);
-
+		
+		DBCollection rollBackCollection = local.get().getDbRollBackCollection();
+		WriteResult result2 = rollBackCollection.save((DBObject) JSON
+				.parse(gson.toJson(rollBackTransactionTable)));
+		if (result2.getError() != null) {
+			throw new MongoCUDException("mongo更新出错！");
+		}
 	}
 
 	/**
@@ -180,21 +197,53 @@ public class MongoTransaction {
 	 *            待删除集合名字
 	 * @param conclusion
 	 *            待删除条件
+	 * @throws UnknownHostException 
+	 * @throws MongoCUDException 
 	 */
 	public static void delete(String dbName, String collectionName,
-			DBObject conclusion) {
+			DBObject query) throws UnknownHostException, MongoCUDException {
+		
+		String _id = UUIDGenerator.getUUID();
 		TransactionTable transactionTable = new TransactionTable();
-		transactionTable.set_id(UUIDGenerator.getUUID()); // UUID id
+		transactionTable.set_id(_id); // UUID id
 		transactionTable.setDbName(dbName);
 		transactionTable.setCollectionName(collectionName);
 		transactionTable.setOperationType(OperationTypeConstants.DELETE);
-		transactionTable.setDbobject1(conclusion);
+		transactionTable.setDbobject1(query);
 		transactionTable.setStatus(TransactionTable.Status.BEGING);
 
 		Gson gson = new Gson();
 
 		DBCollection collection = local.get().getDbCollection();
-		collection.save((DBObject) JSON.parse(gson.toJson(transactionTable)));
+		WriteResult result1 = collection.save((DBObject) JSON.parse(gson.toJson(transactionTable)));
+		if (result1.getError() != null) {
+			throw new MongoCUDException("mongo更新出错！");
+		}
+		
+		// 根据ID，找出所有待删除的数据，将记录插入到库中，多条存数组格式
+		DB db = Mongo
+				.connect(new DBAddress(MongoURLConstants.MONGO_URL, dbName));
+		DBCollection collection4update = db.getCollection(collectionName);
+		DBCursor cursor = collection4update.find(query);
+		BasicDBList dbList = new BasicDBList();
+		while(cursor.hasNext()){
+			DBObject next = cursor.next();
+			dbList.add(next);
+		}
+		TransactionTable rollBackTransactionTable = new TransactionTable();
+		rollBackTransactionTable.set_id(_id);
+		rollBackTransactionTable.setDbName(dbName);
+		rollBackTransactionTable.setCollectionName(collectionName);
+		rollBackTransactionTable.setOperationType(OperationTypeConstants.SAVE);
+		rollBackTransactionTable.setDbobject1(dbList);
+		rollBackTransactionTable.setStatus(TransactionTable.Status.BEGING);
+		
+		DBCollection rollBackCollection = local.get().getDbRollBackCollection();
+		WriteResult result2 = rollBackCollection.save((DBObject) JSON
+				.parse(gson.toJson(rollBackTransactionTable)));
+		if (result2.getError() != null) {
+			throw new MongoCUDException("mongo删除出错！");
+		}
 	}
 
 	/**
