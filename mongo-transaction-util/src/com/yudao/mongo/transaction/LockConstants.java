@@ -17,4 +17,11 @@ public class LockConstants {
 	/** 防止脏读、不可重复读、虚读 */
 	static int TRANSACTION_SERIALIZABLE = 8;
 
+	/*
+	 * TODO
+	 * 行级锁
+	 * 表级锁
+	 * 库级锁
+	 * 锁机制没有健全，现在容易发生数据错乱啊
+	 */
 }

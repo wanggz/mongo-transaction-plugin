@@ -2,6 +2,7 @@
 <classpath>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="src" path="resources"/>
+	<classpathentry kind="src" path="test"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.6"/>
 	<classpathentry kind="lib" path="lib/mongo-java-driver-2.11.3.jar" sourcepath="D:/apache-maven-3.0.4/repo/org/mongodb/mongo-java-driver/2.11.3/mongo-java-driver-2.11.3-sources.jar"/>
 	<classpathentry kind="lib" path="lib/gson-2.2.4.jar"/>

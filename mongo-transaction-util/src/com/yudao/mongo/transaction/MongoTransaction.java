@@ -307,7 +307,7 @@ public class MongoTransaction {
 			DBObject next = dbCursor.next();
 			String status = (String) next.get("status");
 			if (TransactionTable.Status.SUCCEED.equals(status)) {
-
+				
 			}
 		}
 
